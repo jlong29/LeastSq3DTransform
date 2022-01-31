@@ -49,8 +49,8 @@ bool Lsq3Dconfig::parseYaml(std::string const& filename)
 				for (YAML::const_iterator vit=it->second.begin(); vit!=it->second.end();++vit)
 				{
 					sigB.push_back(vit->as<float>());
-					printKeyValue(it->first.as<std::string>(), sigB);
 				}
+				printKeyValue(it->first.as<std::string>(), sigB);
 			}
 			//Get corB
 			if (it->first.as<std::string>() == "corB")
@@ -58,8 +58,8 @@ bool Lsq3Dconfig::parseYaml(std::string const& filename)
 				for (YAML::const_iterator vit=it->second.begin(); vit!=it->second.end();++vit)
 				{
 					corB.push_back(vit->as<float>());
-					printKeyValue(it->first.as<std::string>(), corB);	
 				}
+				printKeyValue(it->first.as<std::string>(), corB);
 			}
 			//Get ProbO
 			if (it->first.as<std::string>() == "ProbO")
@@ -74,8 +74,17 @@ bool Lsq3Dconfig::parseYaml(std::string const& filename)
 				for (YAML::const_iterator vit=it->second.begin(); vit!=it->second.end();++vit)
 				{
 					sigO.push_back(vit->as<float>());
-					printKeyValue(it->first.as<std::string>(), sigO);
 				}
+				printKeyValue(it->first.as<std::string>(), sigO);
+			}
+			//Get Euler Angles
+			if (it->first.as<std::string>() == "EA")
+			{
+				for (YAML::const_iterator vit=it->second.begin(); vit!=it->second.end();++vit)
+				{
+					EA.push_back(vit->as<float>());
+				}
+				printKeyValue(it->first.as<std::string>(), EA);
 			}
 		}
 	}

@@ -16,17 +16,36 @@ ExternalProject_Add(eigen-mvn
 
 # Needed to find headers and library
 ExternalProject_Get_Property(eigen-mvn install_dir)
-message("eigen-mvn install directory is " ${install_dir})
+set(install_dir0 ${install_dir})
+message("eigen-mvn install directory is " ${install_dir0})
 
 add_library(eigen_mvn STATIC IMPORTED)
 
 # Needed to find the library
 # NOTE: /src/eigen-mvn-build are default settings for how cmake organizes downloands and builds
 # same for /src/eigen-mvn for headers below
-set_property(TARGET eigen_mvn PROPERTY IMPORTED_LOCATION ${install_dir}/src/eigen-mvn-build/libeigen_mvn.a)
+set_property(TARGET eigen_mvn PROPERTY IMPORTED_LOCATION ${install_dir0}/src/eigen-mvn-build/libeigen_mvn.a)
 
 # Needed to trigger build of library
 add_dependencies(eigen_mvn eigen-mvn)
+
+ExternalProject_Add(LieAlgebras
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/LieAlgebras
+    GIT_REPOSITORY https://github.com/jlong29/lieAlgebras.git
+)
+
+# Needed to find headers and library
+ExternalProject_Get_Property(LieAlgebras install_dir)
+set(install_dir1 ${install_dir})
+message("LieAlgebras install directory is " ${install_dir1})
+
+add_library(lieAlgebras STATIC IMPORTED)
+
+# Needed to find the library
+set_property(TARGET lieAlgebras PROPERTY IMPORTED_LOCATION ${install_dir1}/src/LieAlgebras-build/liblieAlgebras.a)
+
+# Needed to trigger build of library
+add_dependencies(lieAlgebras LieAlgebras)
 
 # the `pkg_check_modules` function is created with this call
 find_package(PkgConfig REQUIRED)
@@ -66,7 +85,8 @@ target_include_directories(
 	PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}
 		$ENV{EIGEN_ROOT_DIR}
-		${install_dir}/src/eigen-mvn
+		${install_dir0}/src/eigen-mvn
+		${install_dir1}/src/LieAlgebras
 		${YAMLCPP_INCLUDE_DIRS}
 )
-target_link_libraries(leastSq3D1 utilities eigen_mvn ${YAMLCPP_LIBRARIES})
+target_link_libraries(leastSq3D1 utilities eigen_mvn lieAlgebras ${YAMLCPP_LIBRARIES})
