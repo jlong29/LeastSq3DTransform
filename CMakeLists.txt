@@ -9,17 +9,24 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/leastSqs3Dparams.yaml
 
 include(ExternalProject)
 
-set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
-
 ExternalProject_Add(eigen-mvn
-    GIT_REPOSITORY https://github.com/jlong29/eigen-mvn.git
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/eigen-mvn
-    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/eigen-mvn-install}
+    GIT_REPOSITORY https://github.com/jlong29/eigen-mvn.git
 )
 
+# Needed to find headers and library
 ExternalProject_Get_Property(eigen-mvn install_dir)
-
 message("eigen-mvn install directory is " ${install_dir})
+
+add_library(eigen_mvn STATIC IMPORTED)
+
+# Needed to find the library
+# NOTE: /src/eigen-mvn-build are default settings for how cmake organizes downloands and builds
+# same for /src/eigen-mvn for headers below
+set_property(TARGET eigen_mvn PROPERTY IMPORTED_LOCATION ${install_dir}/src/eigen-mvn-build/libeigen_mvn.a)
+
+# Needed to trigger build of library
+add_dependencies(eigen_mvn eigen-mvn)
 
 # the `pkg_check_modules` function is created with this call
 find_package(PkgConfig REQUIRED)
@@ -52,7 +59,6 @@ target_link_libraries(utilities ${YAMLCPP_LIBRARIES})
 
 # Case1: Basic Recreation of Python example
 add_executable(leastSq3D1 leastSq3D1.cpp)
-add_dependencies(leastSq3D1 eigen-mvn)
 set_target_properties(leastSq3D1 PROPERTIES LINKER_LANGUAGE CXX)
 target_compile_options(leastSq3D1 PRIVATE -O3 -Wall -Wextra)
 target_include_directories(
@@ -60,6 +66,7 @@ target_include_directories(
 	PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}
 		$ENV{EIGEN_ROOT_DIR}
+		${install_dir}/src/eigen-mvn
 		${YAMLCPP_INCLUDE_DIRS}
 )
 target_link_libraries(leastSq3D1 utilities eigen_mvn ${YAMLCPP_LIBRARIES})
