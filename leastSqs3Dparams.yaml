@@ -1,0 +1,22 @@
+Lsq3Dconfig:
+  #Data Directory
+  dataDir: ${HOME}/Dropbox/Code/C_C++/Exercises/Eigen/LeastSqs3DptTransform/data
+  # Number of datapoints
+  N: 10
+  # Baseline Noise
+  sigB:
+    - 0.2
+    - 0.2
+    - 0.2
+  # Baseline Correlation: c12, c13, c23
+  corB:
+    - 0.0
+    - 0.0
+    - 0.0
+  # Outlier Probability
+  ProbO: 0.01
+  # Outlier covariances
+  sigO:
+    - 0.05
+    - 0.05
+    - 0.05
