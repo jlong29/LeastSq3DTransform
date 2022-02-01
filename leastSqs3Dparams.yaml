@@ -25,3 +25,8 @@ Lsq3Dconfig:
     - 10.0
     - 20.0
     - 30.0
+  # Translation
+  T:
+    - 0.1
+    - 0.2
+    - 0.3

@@ -38,8 +38,11 @@ public:
 	//Outlier Noise
 	std::vector<float> sigO;
 
+	// 3D Transformation
 	//Euler Angles for Rotation Matrix (degrees)
 	std::vector<float> EA;
+	//Translation
+	std::vector<float> T;
 
 	//Constructors
 	Lsq3Dconfig():initialized(false){};

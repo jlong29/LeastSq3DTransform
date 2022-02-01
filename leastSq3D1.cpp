@@ -39,6 +39,16 @@ float degrees2radians(float deg)
   return deg*(PI/180.0f);
 }
 
+// Forward Declarations
+//Mean over each dimension of 3D vector
+Eigen::Vector3f meanVectorEigenV3f( std::vector< Eigen::Vector3f > const& data);
+
+template<typename T>
+std::vector<float> linspace(T start_in, T end_in, int num_in);
+
+template<typename T>
+void print_vector(std::vector<T> vec);
+
 //////////
 // MAIN //
 //////////
@@ -53,11 +63,21 @@ int main()
 	std::vector<float> corB(config.corB.begin(), config.corB.end());
 	std::vector<float> sigO(config.sigO.begin(), config.sigO.end());
 
+	// 3D Transformation
+	Eigen::Vector3f EA, T;
 	//Transform Euler Angles from degrees to radians
 	std::transform(config.EA.begin(), config.EA.end(), config.EA.begin(), degrees2radians);
-	Eigen::Vector3f EA;
 	EA << config.EA[0], config.EA[1], config.EA[2];
+	T << config.T[0], config.T[1], config.T[2];
+
 	std::cout << "Euler Angles (radians): " << EA.transpose() << std::endl;
+	std::cout << "Translation: " << T.transpose() << std::endl;
+
+	//Create Rotation matrix from Euler Angles
+	Eigen::Matrix3f R;
+	composeRotationFromEuler(EA, R);
+
+	std::cout << "\nR:\n" << R << std::endl;
 
 	// Define the covariance matrix and the mean
 	Eigen::VectorXf mu(3);
@@ -88,26 +108,158 @@ int main()
 	mvnO.setParameters(mu, covO);
 
 	//Create Python Sample Data
-	std::vector< Eigen::Vector3f > data;
-	data.reserve(N);
+	std::vector<float> seed = linspace(1,3,N);
+	print_vector<float>(seed);
+
+	std::vector< Eigen::Vector3f > p1;
+	p1.reserve(N);
 	for (int ii = 0; ii < N; ii++)
 	{
 		Eigen::Vector3f vec;
-		vec(0) = 1.0f + ii*(3.0f-1.0f)/(float)N;
+		vec(0) = seed[ii];
 		vec(1) = sin(vec(0));
 		vec(2) = cos(vec(0));
-		data.push_back(vec);
+		p1.push_back(vec);
 	}
 
-	// //Create Rotation matrix from Euler Angles
-	Eigen::Matrix3f R;
-	composeRotationFromEuler(EA, R);
+	//Create Transformed Sample Data
+	std::vector< Eigen::Vector3f > p2;
+	p2.reserve(N);
 
-	std::cout << "\nR:\n" << R << std::endl;
+	for (int ii = 0; ii < N; ii++)
+	{
+		Eigen::Vector3f vec = R*p1[ii] + T;
+		p2.push_back(vec);
+	}
 
-	// for (int ii = 0; ii < config.N; ii++)
-	// {
-	// 	std::cout << data[ii].transpose() << std::endl;
-	// }
+	std::cout << "Inspect p1 and Transformed p2:" << std::endl;
+	for (int ii = 0; ii < N; ii++)
+	{
+		std::cout << "\tp1_" << ii << ": " << p1[ii].transpose() << std::endl;
+		std::cout << "\tp2_" << ii << ": " << p2[ii].transpose() << std::endl<<std::endl;
+	}
+
+	//Compute the mean vector of data and p2
+	Eigen::Vector3f p1c = meanVectorEigenV3f(p1);
+	Eigen::Vector3f p2c = meanVectorEigenV3f(p2);
+
+	std::cout << "p1 mean: " << p1c.transpose() << std::endl;
+	std::cout << "p2 mean: " << p2c.transpose() << std::endl;
+
+	//Subtract the means from each respective set of data
+	std::vector< Eigen::Vector3f > q1;
+	std::vector< Eigen::Vector3f > q2;
+	q1.reserve(N); q2.reserve(N);
+
+	for (int ii = 0; ii < N; ii++)
+	{
+		q1.push_back(p1[ii] - p1c);
+		q2.push_back(p2[ii] - p2c);
+	}
+
+	std::cout << "Mean subtracted q1 and Transformed q2:" << std::endl;
+	for (int ii = 0; ii < N; ii++)
+	{
+		std::cout << "\tq1_" << ii << ": " << q1[ii].transpose() << std::endl;
+		std::cout << "\tq2_" << ii << ": " << q2[ii].transpose() << std::endl<<std::endl;
+	}
+
+	//Compute H matrix as input to SVD
+	Eigen::Matrix3f H = Eigen::Matrix3f::Zero();
+	for (int ii = 0; ii < N; ii++)
+	{
+		H += q1[ii]*q2[ii].transpose();
+	}
+	std::cout << "\nH:\n" << H << std::endl;
+
+	//SVD
+	Eigen::Matrix3f U, Ut, V;   //Orthogonal matrices
+	Eigen::JacobiSVD<Eigen::Matrix3f> svd(H, Eigen::ComputeFullV | Eigen::ComputeFullU);
+	U  = svd.matrixU();
+	V  = svd.matrixV();
+
+	//Getting the combo transposes right took some guessing
+	Ut = U.transpose();
+	Eigen::Matrix3f R2 = V*Ut;
+
+	std::cout << "\nR2:\n" << R2 << std::endl;
+	std::cout << "det(R2) = " << R2.determinant() << std::endl;
+
+	Eigen::Vector3f T2 = p2c - R*p1c;
+	std::cout << "T2 = " << T2.transpose() << std::endl;
+
+	//Create Estimate of Transformed Sample Data
+	std::vector< Eigen::Vector3f > p3;
+	p3.reserve(N);
+
+	for (int ii = 0; ii < N; ii++)
+	{
+		Eigen::Vector3f vec = R2*p1[ii] + T2;
+		p3.push_back(vec);
+	}
+	std::cout << "Inspect p1, Transformed p2, and Estimated p3:" << std::endl;
+	for (int ii = 0; ii < N; ii++)
+	{
+		std::cout << "\tp1_" << ii << ": " << p1[ii].transpose() << std::endl;
+		std::cout << "\tp2_" << ii << ": " << p2[ii].transpose() << std::endl;
+		std::cout << "\tp3_" << ii << ": " << p3[ii].transpose() << std::endl<<std::endl;
+	}
+
 	return 0;
+}
+
+//Mean over each dimension of 3D vector
+Eigen::Vector3f meanVectorEigenV3f( std::vector< Eigen::Vector3f > const& data)
+{
+	Eigen::Vector3f mean;
+	mean << 0.0f, 0.0f, 0.0f;
+	for (size_t ii = 0; ii < data.size(); ii++)
+	{
+		mean(0) += data[ii](0);
+		mean(1) += data[ii](1);
+		mean(2) += data[ii](2);
+	}
+	mean(0) /= data.size();
+	mean(1) /= data.size();
+	mean(2) /= data.size();
+
+	return mean;
+}
+
+//Like Numpy's linspace
+template<typename T>
+std::vector<float> linspace(T start_in, T end_in, int num_in)
+{
+
+  std::vector<float> linspaced;
+
+  float start = static_cast<float>(start_in);
+  float end = static_cast<float>(end_in);
+  float num = static_cast<float>(num_in);
+
+  if (num == 0) { return linspaced; }
+  if (num == 1) 
+    {
+      linspaced.push_back(start);
+      return linspaced;
+    }
+
+  float delta = (end - start) / (num - 1);
+
+  for(int i=0; i < num-1; ++i)
+    {
+      linspaced.push_back(start + delta * i);
+    }
+  linspaced.push_back(end); // I want to ensure that start and end
+                            // are exactly the same as the input
+  return linspaced;
+}
+
+template<typename T>
+void print_vector(std::vector<T> vec)
+{
+  std::cout << "size: " << vec.size() << std::endl;
+  for (T d : vec)
+    std::cout << d << " ";
+  std::cout << std::endl;
 }

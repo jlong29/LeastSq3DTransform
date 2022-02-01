@@ -86,6 +86,15 @@ bool Lsq3Dconfig::parseYaml(std::string const& filename)
 				}
 				printKeyValue(it->first.as<std::string>(), EA);
 			}
+			//Get Translation
+			if (it->first.as<std::string>() == "T")
+			{
+				for (YAML::const_iterator vit=it->second.begin(); vit!=it->second.end();++vit)
+				{
+					T.push_back(vit->as<float>());
+				}
+				printKeyValue(it->first.as<std::string>(), T);
+			}
 		}
 	}
 	std::cout << std::endl;
