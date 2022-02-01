@@ -47,7 +47,7 @@ template<typename T>
 std::vector<float> linspace(T start_in, T end_in, int num_in);
 
 template<typename T>
-void print_vector(std::vector<T> vec);
+void print_vector(const std::string& vecName, std::vector<T> vec);
 
 //////////
 // MAIN //
@@ -77,39 +77,9 @@ int main()
 	Eigen::Matrix3f R;
 	composeRotationFromEuler(EA, R);
 
-	std::cout << "\nR:\n" << R << std::endl;
-
-	// Define the covariance matrix and the mean
-	Eigen::VectorXf mu(3);
-	Eigen::MatrixXf covB(3, 3);
-	Eigen::MatrixXf covO(3, 3);
-
-	//All noise is zero mean
-	mu << 0.0f, 0.0f, 0.0f;
-
-	//Construct Baseline Covariance matrix from variance and correlation coefficients
-	covB << sigB[0], corB[0]*sqrt(sigB[0])*sqrt(sigB[1]), corB[1]*sqrt(sigB[0])*sqrt(sigB[2]),
-			corB[0]*sqrt(sigB[0])*sqrt(sigB[1]), sigB[1], corB[2]*sqrt(sigB[1])*sqrt(sigB[2]),
-			corB[1]*sqrt(sigB[0])*sqrt(sigB[2]), corB[2]*sqrt(sigB[1])*sqrt(sigB[2]), sigB[2];
-
-	std::cout << "\ncovB:\n" << covB << std::endl;
-
-	//Construct Outlier Covariance matrix
-	covO << sigO[0], 0.0f, 0.0f,
-			0.0f, sigO[1], 0.0f,
-			0.0f, 0.0f, sigO[2];
-
-	//Create Baseline Noise Sampler
-	Mvn mvnB(3, N);
-	mvnB.setParameters(mu, covB);
-
-	//Create Outlier Noise Sampler
-	Mvn mvnO(3, N);
-	mvnO.setParameters(mu, covO);
-
-	//Create Python Sample Data
+	//Create Python Sample Data (p1) and Transformed Data (p2)
 	std::vector<float> seed = linspace(1,3,N);
-	print_vector<float>(seed);
+	print_vector<float>("seed", seed);
 
 	std::vector< Eigen::Vector3f > p1;
 	p1.reserve(N);
@@ -120,6 +90,56 @@ int main()
 		vec(1) = sin(vec(0));
 		vec(2) = cos(vec(0));
 		p1.push_back(vec);
+	}
+
+	//Check whether to add baseline and outlier noise to the data (p1)
+	if (config.addNoise)
+	{
+		//All noise, baseline and outliers is zero mean
+		Eigen::VectorXf mu(3);
+		mu << 0.0f, 0.0f, 0.0f;
+
+		//Create Baseline Noise Sampler
+		Mvn mvnB(3, N);
+
+		// Define the covariance matrix
+		Eigen::MatrixXf covB(3, 3);
+
+
+		//Construct Baseline Covariance matrix from variance and correlation coefficients
+		covB << sigB[0], corB[0]*sqrt(sigB[0])*sqrt(sigB[1]), corB[1]*sqrt(sigB[0])*sqrt(sigB[2]),
+				corB[0]*sqrt(sigB[0])*sqrt(sigB[1]), sigB[1], corB[2]*sqrt(sigB[1])*sqrt(sigB[2]),
+				corB[1]*sqrt(sigB[0])*sqrt(sigB[2]), corB[2]*sqrt(sigB[1])*sqrt(sigB[2]), sigB[2];
+
+		std::cout << "\ncovB:\n" << covB << std::endl;
+
+		//Set Parameters
+		mvnB.setParameters(mu, covB);
+		mvnB.sample();
+
+		//Add Baseline Noise to p1
+		for (int ii = 0; ii < N; ii++)
+		{
+			Eigen::Vector3f vec;
+			vec << mvnB.Z[3*ii + 0], mvnB.Z[3*ii + 1], mvnB.Z[3*ii + 2];
+			p1[ii] += vec;
+		}
+
+		if (config.addOutliers)
+		{
+			//Create Outlier Noise Sampler
+			Mvn mvnO(3, (int)((float)N*config.ProbO));
+			//Construct Outlier Covariance matrix
+			Eigen::MatrixXf covO(3, 3);
+			covO << sigO[0], 0.0f, 0.0f,
+				0.0f, sigO[1], 0.0f,
+				0.0f, 0.0f, sigO[2];
+			
+			std::cout << "covO:\n" << covO << std::endl << std::endl;
+
+			//Set parameters
+			mvnO.setParameters(mu, covO);
+		}
 	}
 
 	//Create Transformed Sample Data
@@ -170,7 +190,6 @@ int main()
 	{
 		H += q1[ii]*q2[ii].transpose();
 	}
-	std::cout << "\nH:\n" << H << std::endl;
 
 	//SVD
 	Eigen::Matrix3f U, Ut, V;   //Orthogonal matrices
@@ -182,11 +201,15 @@ int main()
 	Ut = U.transpose();
 	Eigen::Matrix3f R2 = V*Ut;
 
+	std::cout << "Inspect H and Compare Initial to Estimated Transformation:\n" << std::endl;
+	std::cout << "H:\n" << H << std::endl;
+	std::cout << "R:\n" << R << std::endl;
 	std::cout << "\nR2:\n" << R2 << std::endl;
-	std::cout << "det(R2) = " << R2.determinant() << std::endl;
+	std::cout << "det(R2) = " << R2.determinant() << std::endl << std::endl;
 
-	Eigen::Vector3f T2 = p2c - R*p1c;
-	std::cout << "T2 = " << T2.transpose() << std::endl;
+	std::cout << "T  = " << T.transpose() << std::endl;
+	Eigen::Vector3f T2 = p2c - R2*p1c;
+	std::cout << "T2 = " << T2.transpose() << std::endl << std::endl;
 
 	//Create Estimate of Transformed Sample Data
 	std::vector< Eigen::Vector3f > p3;
@@ -256,9 +279,9 @@ std::vector<float> linspace(T start_in, T end_in, int num_in)
 }
 
 template<typename T>
-void print_vector(std::vector<T> vec)
+void print_vector(const std::string& vecName, std::vector<T> vec)
 {
-  std::cout << "size: " << vec.size() << std::endl;
+  std::cout << vecName << " of size " << vec.size() << std::endl;
   for (T d : vec)
     std::cout << d << " ";
   std::cout << std::endl;

@@ -29,11 +29,15 @@ public:
 	int N;
 
 	//Baseline Noise
+	bool addNoise;
+
 	std::vector<float> sigB;
 	//Baseline Coorelation: cor12, cor13, cor23
 	std::vector<float> corB;
 
 	//Outlier Probability
+	bool addOutliers;
+
 	float ProbO;
 	//Outlier Noise
 	std::vector<float> sigO;
@@ -45,9 +49,13 @@ public:
 	std::vector<float> T;
 
 	//Constructors
-	Lsq3Dconfig():initialized(false){};
+	Lsq3Dconfig():
+		initialized(false)
+	{};
 
 	Lsq3Dconfig(std::string const& filename):
+		addNoise(false),
+		addOutliers(false),
 		initialized(false)
 	{
 		loadConfiguration(filename);

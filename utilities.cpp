@@ -43,6 +43,13 @@ bool Lsq3Dconfig::parseYaml(std::string const& filename)
 				printKeyValue(it->first.as<std::string>(), N);
 				continue;
 			}
+			//Get addNoise
+			if (it->first.as<std::string>() == "addNoise")
+			{
+				addNoise = it->second.as<bool>();
+				printKeyValue(it->first.as<std::string>(), addNoise);
+				continue;
+			}
 			//Get sigB
 			if (it->first.as<std::string>() == "sigB")
 			{
@@ -60,6 +67,13 @@ bool Lsq3Dconfig::parseYaml(std::string const& filename)
 					corB.push_back(vit->as<float>());
 				}
 				printKeyValue(it->first.as<std::string>(), corB);
+			}
+			//Get addOutliers
+			if (it->first.as<std::string>() == "addOutliers")
+			{
+				addOutliers = it->second.as<bool>();
+				printKeyValue(it->first.as<std::string>(), addOutliers);
+				continue;
 			}
 			//Get ProbO
 			if (it->first.as<std::string>() == "ProbO")

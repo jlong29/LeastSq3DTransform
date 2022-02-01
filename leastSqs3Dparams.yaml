@@ -4,6 +4,7 @@ Lsq3Dconfig:
   # Number of datapoints
   N: 10
   # Baseline Noise
+  addNoise: false
   sigB:
     - 0.2
     - 0.2
@@ -14,6 +15,7 @@ Lsq3Dconfig:
     - 0.0
     - 0.0
   # Outlier Probability
+  addOutliers: false
   ProbO: 0.01
   # Outlier covariances
   sigO:
