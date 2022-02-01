@@ -22,6 +22,8 @@ by: John D. Long II, PhD
 #include <vector>
 #include <math.h>
 #include <algorithm>
+#include <stdlib.h>     /* srand, rand */
+#include <time.h>       /* time */
 
 //Project Utilities
 #include "utilities.h"
@@ -48,6 +50,9 @@ std::vector<float> linspace(T start_in, T end_in, int num_in);
 
 template<typename T>
 void print_vector(const std::string& vecName, std::vector<T> vec);
+
+// Function to return the next random number
+int getNum(std::vector<int>& v);
 
 //////////
 // MAIN //
@@ -127,8 +132,12 @@ int main()
 
 		if (config.addOutliers)
 		{
+			//Set the number of outliers
+			int Noutliers = (int)((float)N*config.ProbO);
+			std::cout << "Outliers: " << Noutliers << " out of " << N << std::endl;
+
 			//Create Outlier Noise Sampler
-			Mvn mvnO(3, (int)((float)N*config.ProbO));
+			Mvn mvnO(3, Noutliers);
 			//Construct Outlier Covariance matrix
 			Eigen::MatrixXf covO(3, 3);
 			covO << sigO[0], 0.0f, 0.0f,
@@ -139,6 +148,26 @@ int main()
 
 			//Set parameters
 			mvnO.setParameters(mu, covO);
+
+			/* initialize random seed: */
+			srand (time(NULL));
+
+			//Set outliers
+			mvnO.sample();
+			std::vector<int> indices;
+			for (int ii = 0; ii < N; ii++)
+				indices.push_back(ii);
+
+			for (int ii = 0; ii < Noutliers; ii++)
+			{
+				Eigen::Vector3f vec;
+				vec << mvnO.Z[3*ii + 0], mvnO.Z[3*ii + 1], mvnO.Z[3*ii + 2];
+
+				//Generate non-repeating random index between 0 and N
+				int idx = getNum(indices);
+				std::cout << "\tOutlier at " << idx << std::endl;
+				p1[idx] += vec;
+			}
 		}
 	}
 
@@ -262,19 +291,19 @@ std::vector<float> linspace(T start_in, T end_in, int num_in)
 
   if (num == 0) { return linspaced; }
   if (num == 1) 
-    {
-      linspaced.push_back(start);
-      return linspaced;
-    }
+	{
+	  linspaced.push_back(start);
+	  return linspaced;
+	}
 
   float delta = (end - start) / (num - 1);
 
   for(int i=0; i < num-1; ++i)
-    {
-      linspaced.push_back(start + delta * i);
-    }
+	{
+	  linspaced.push_back(start + delta * i);
+	}
   linspaced.push_back(end); // I want to ensure that start and end
-                            // are exactly the same as the input
+							// are exactly the same as the input
   return linspaced;
 }
 
@@ -283,6 +312,31 @@ void print_vector(const std::string& vecName, std::vector<T> vec)
 {
   std::cout << vecName << " of size " << vec.size() << std::endl;
   for (T d : vec)
-    std::cout << d << " ";
+	std::cout << d << " ";
   std::cout << std::endl;
+}
+
+// Function to return the next random number
+int getNum(std::vector<int>& v)
+{
+ 
+    // Size of the vector
+    int n = v.size();
+ 
+    // Generate a random number
+    srand(time(NULL));
+ 
+    // Make sure the number is within
+    // the index range
+    int index = rand() % n;
+ 
+    // Get random number from the vector
+    int num = v[index];
+ 
+    // Remove the number from the vector
+    std::swap(v[index], v[n - 1]);
+    v.pop_back();
+ 
+    // Return the removed number
+    return num;
 }

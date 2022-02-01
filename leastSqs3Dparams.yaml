@@ -22,7 +22,7 @@ Lsq3Dconfig:
     - 0.05
     - 0.05
     - 0.05
-  # Euler Angles
+  # Euler Angles (degrees)
   EA:
     - 10.0
     - 20.0
