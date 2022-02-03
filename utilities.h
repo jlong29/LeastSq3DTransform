@@ -48,6 +48,9 @@ public:
 	//Translation
 	std::vector<float> T;
 
+	//Flag for inspecting data
+	bool inspectData;
+
 	//Constructors
 	Lsq3Dconfig():
 		initialized(false)

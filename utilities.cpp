@@ -109,6 +109,13 @@ bool Lsq3Dconfig::parseYaml(std::string const& filename)
 				}
 				printKeyValue(it->first.as<std::string>(), T);
 			}
+			//Get inspectData
+			if (it->first.as<std::string>() == "inspectData")
+			{
+				inspectData = it->second.as<bool>();
+				printKeyValue(it->first.as<std::string>(), inspectData);
+				continue;
+			}
 		}
 	}
 	std::cout << std::endl;

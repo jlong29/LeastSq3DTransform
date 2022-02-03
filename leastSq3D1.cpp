@@ -40,6 +40,10 @@ float degrees2radians(float deg)
 {
   return deg*(PI/180.0f);
 }
+float radians2degrees(float rad)
+{
+	return rad*(180.0f/PI);
+}
 
 // Forward Declarations
 //Mean over each dimension of 3D vector
@@ -75,16 +79,12 @@ int main()
 	EA << config.EA[0], config.EA[1], config.EA[2];
 	T << config.T[0], config.T[1], config.T[2];
 
-	std::cout << "Euler Angles (radians): " << EA.transpose() << std::endl;
-	std::cout << "Translation: " << T.transpose() << std::endl;
-
 	//Create Rotation matrix from Euler Angles
 	Eigen::Matrix3f R;
 	composeRotationFromEuler(EA, R);
 
 	//Create Python Sample Data (p1) and Transformed Data (p2)
 	std::vector<float> seed = linspace(1,3,N);
-	print_vector<float>("seed", seed);
 
 	std::vector< Eigen::Vector3f > p1;
 	p1.reserve(N);
@@ -97,7 +97,17 @@ int main()
 		p1.push_back(vec);
 	}
 
-	//Check whether to add baseline and outlier noise to the data (p1)
+	//Create Transformed Sample Data
+	std::vector< Eigen::Vector3f > p2;
+	p2.reserve(N);
+
+	for (int ii = 0; ii < N; ii++)
+	{
+		Eigen::Vector3f vec = R*p1[ii] + T;
+		p2.push_back(vec);
+	}
+
+	//Check whether to add baseline and outlier noise to the transformed data (p2)
 	if (config.addNoise)
 	{
 		//All noise, baseline and outliers is zero mean
@@ -116,7 +126,7 @@ int main()
 				corB[0]*sqrt(sigB[0])*sqrt(sigB[1]), sigB[1], corB[2]*sqrt(sigB[1])*sqrt(sigB[2]),
 				corB[1]*sqrt(sigB[0])*sqrt(sigB[2]), corB[2]*sqrt(sigB[1])*sqrt(sigB[2]), sigB[2];
 
-		std::cout << "\ncovB:\n" << covB << std::endl;
+		std::cout << "covB:\n" << covB << std::endl << std::endl;
 
 		//Set Parameters
 		mvnB.setParameters(mu, covB);
@@ -127,7 +137,7 @@ int main()
 		{
 			Eigen::Vector3f vec;
 			vec << mvnB.Z[3*ii + 0], mvnB.Z[3*ii + 1], mvnB.Z[3*ii + 2];
-			p1[ii] += vec;
+			p2[ii] += vec;
 		}
 
 		if (config.addOutliers)
@@ -165,27 +175,23 @@ int main()
 
 				//Generate non-repeating random index between 0 and N
 				int idx = getNum(indices);
-				std::cout << "\tOutlier at " << idx << std::endl;
-				p1[idx] += vec;
+				p2[idx] += vec;
 			}
 		}
 	}
 
-	//Create Transformed Sample Data
-	std::vector< Eigen::Vector3f > p2;
-	p2.reserve(N);
-
-	for (int ii = 0; ii < N; ii++)
+	if (config.inspectData)
 	{
-		Eigen::Vector3f vec = R*p1[ii] + T;
-		p2.push_back(vec);
-	}
+		print_vector<float>("seed", seed);
+		std::cout << "Euler Angles (radians): " << EA.transpose() << std::endl;
+		std::cout << "Translation: " << T.transpose() << std::endl;
 
-	std::cout << "Inspect p1 and Transformed p2:" << std::endl;
-	for (int ii = 0; ii < N; ii++)
-	{
-		std::cout << "\tp1_" << ii << ": " << p1[ii].transpose() << std::endl;
-		std::cout << "\tp2_" << ii << ": " << p2[ii].transpose() << std::endl<<std::endl;
+		std::cout << "Inspect p1 and Transformed p2:" << std::endl;
+		for (int ii = 0; ii < N; ii++)
+		{
+			std::cout << "\tp1_" << ii << ": " << p1[ii].transpose() << std::endl;
+			std::cout << "\tp2_" << ii << ": " << p2[ii].transpose() << std::endl<<std::endl;
+		}
 	}
 
 	//Compute the mean vector of data and p2
@@ -206,13 +212,15 @@ int main()
 		q2.push_back(p2[ii] - p2c);
 	}
 
-	std::cout << "Mean subtracted q1 and Transformed q2:" << std::endl;
-	for (int ii = 0; ii < N; ii++)
+	if (config.inspectData)
 	{
-		std::cout << "\tq1_" << ii << ": " << q1[ii].transpose() << std::endl;
-		std::cout << "\tq2_" << ii << ": " << q2[ii].transpose() << std::endl<<std::endl;
+		std::cout << "Mean subtracted q1 and Transformed q2:" << std::endl;
+		for (int ii = 0; ii < N; ii++)
+		{
+			std::cout << "\tq1_" << ii << ": " << q1[ii].transpose() << std::endl;
+			std::cout << "\tq2_" << ii << ": " << q2[ii].transpose() << std::endl<<std::endl;
+		}
 	}
-
 	//Compute H matrix as input to SVD
 	Eigen::Matrix3f H = Eigen::Matrix3f::Zero();
 	for (int ii = 0; ii < N; ii++)
@@ -230,31 +238,40 @@ int main()
 	Ut = U.transpose();
 	Eigen::Matrix3f R2 = V*Ut;
 
+	Eigen::Vector3f EA2;
+	getEulerAngles(R2, EA2);
+
 	std::cout << "Inspect H and Compare Initial to Estimated Transformation:\n" << std::endl;
 	std::cout << "H:\n" << H << std::endl;
 	std::cout << "R:\n" << R << std::endl;
 	std::cout << "\nR2:\n" << R2 << std::endl;
 	std::cout << "det(R2) = " << R2.determinant() << std::endl << std::endl;
 
+	std::cout << "EA:  " << radians2degrees(EA(0)) << ", " << radians2degrees(EA(1)) << ", " << radians2degrees(EA(2)) << std::endl;
+	std::cout << "EA2: " << radians2degrees(EA2(0)) << ", " << radians2degrees(EA2(1)) << ", " << radians2degrees(EA2(2)) << std::endl << std::endl;
+
 	std::cout << "T  = " << T.transpose() << std::endl;
 	Eigen::Vector3f T2 = p2c - R2*p1c;
 	std::cout << "T2 = " << T2.transpose() << std::endl << std::endl;
 
 	//Create Estimate of Transformed Sample Data
-	std::vector< Eigen::Vector3f > p3;
-	p3.reserve(N);
+	if (config.inspectData)
+	{
+		std::vector< Eigen::Vector3f > p3;
+		p3.reserve(N);
 
-	for (int ii = 0; ii < N; ii++)
-	{
-		Eigen::Vector3f vec = R2*p1[ii] + T2;
-		p3.push_back(vec);
-	}
-	std::cout << "Inspect p1, Transformed p2, and Estimated p3:" << std::endl;
-	for (int ii = 0; ii < N; ii++)
-	{
-		std::cout << "\tp1_" << ii << ": " << p1[ii].transpose() << std::endl;
-		std::cout << "\tp2_" << ii << ": " << p2[ii].transpose() << std::endl;
-		std::cout << "\tp3_" << ii << ": " << p3[ii].transpose() << std::endl<<std::endl;
+		for (int ii = 0; ii < N; ii++)
+		{
+			Eigen::Vector3f vec = R2*p1[ii] + T2;
+			p3.push_back(vec);
+		}
+		std::cout << "Inspect p1, Transformed p2, and Estimated p3:" << std::endl;
+		for (int ii = 0; ii < N; ii++)
+		{
+			std::cout << "\tp1_" << ii << ": " << p1[ii].transpose() << std::endl;
+			std::cout << "\tp2_" << ii << ": " << p2[ii].transpose() << std::endl;
+			std::cout << "\tp3_" << ii << ": " << p3[ii].transpose() << std::endl<<std::endl;
+		}
 	}
 
 	return 0;
